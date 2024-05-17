@@ -1,4 +1,4 @@
-# Dengue Fever Prediction Analysis using Machine Learning
+# Dengue Fever Prediction Analysis with Machine Learning
 
 # Abstract
 Summary: This report conducted an integrative analysis of gene expression data from samples across a spectrum of dengue infection states: dengue fever (DF), dengue haemorrhagic fever (DHF), convalescent individuals, and healthy controls.
