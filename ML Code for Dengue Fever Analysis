@@ -1,0 +1,239 @@
+# Q1) To what extent does the gene expression profile of a patient differ between the four populations?
+
+# Import library needed 
+import pandas as pd
+# Read the data and metadata CSV files into pandas dataframes
+
+data_df = pd.read_csv('dengue_data.csv', index_col=0)
+metadata_df = pd.read_csv('dengue_metadata.csv')
+
+# Display the dataframe
+print("Data dataframe:")
+data_df
+print("\nMetadata dataframe:") 
+metadata_df
+
+# Import library needed 
+
+from sklearn.decomposition import PCA import matplotlib.pyplot as plt import seaborn as sns
+
+# Read the data and metadata CSV files into pandas dataframes
+data_df = pd.read_csv('dengue_data.csv', index_col=0)
+metadata_df = pd.read_csv('dengue_metadata.csv')
+
+# Transpose the gene expression data so that samples are rows and genes are␣ ↪columns
+data_transposed = data_df.T
+
+# Merge the metadata with the transposed gene expression data and use the 'sample' column from metadata and the index from the transposed data
+merged_data = data_transposed.merge(metadata_df, left_index=True,␣ ↪right_on='sample')
+
+# Select numeric data for PCA
+gene_expression_data = merged_data.select_dtypes(include=[float, int])
+
+# Perform PCA
+pca = PCA(n_components=10)
+pca.fit(gene_expression_data)
+principal_components = pca.transform(gene_expression_data)
+explained_variance = pca.explained_variance_ratio_
+print('The explained variance values are:')
+print(explained_variance)
+
+# Create DataFrame for the PCA results and fix columns to match the principal components
+pca_df = pd.DataFrame(data=principal_components, columns=[f'PC{i}' for i in range(1, 11)]) # Adjusted columns
+pca_df['Disease State'] = merged_data['disease.state']
+
+# Create a PCA scatter plot
+plt.figure(figsize=(12, 10))
+sns.scatterplot(x='PC1', y='PC2', hue='Disease State', data=pca_df,palette=['darkblue', 'darkmagenta', 'darkgreen', 'orange']) 
+
+# Define a title and the labels
+plt.title('PCA of Gene Expression Data by Disease State') 
+plt.xlabel(f'PCA 1 ({explained_variance[0]*100:.2f}% Variance)') 
+plt.ylabel(f'PCA 2 ({explained_variance[1]*100:.2f}% Variance)') 
+plt.legend(title='Disease State')
+plt.show()
+
+# Import library needed 
+from scipy.cluster.hierarchy import dendrogram, linkage import matplotlib.pyplot as plt
+
+# Read the data and metadata CSV files into pandas dataframes
+data_df = pd.read_csv('dengue_data.csv', index_col=0)
+metadata_df = pd.read_csv('dengue_metadata.csv')
+
+# Merge the metadata with the transposed data
+merged_data = pd.merge(metadata_df, data_transposed, left_on='sample',␣ ↪right_index=True)
+
+# Perform hierarchical clustering using Ward's method
+linked = linkage(data_transposed, method='ward', metric='euclidean')
+
+# Define the color dictionary to create different disease states
+color_dict = {
+    'Convalescent': 'darkblue',
+    'Dengue Hemorrhagic Fever': 'darkmagenta',
+    'Dengue Fever': 'darkgreen',
+    'healthy control': 'orange'
+}
+
+# Create a figure for the dendrogram representation
+plt.figure(figsize=(20, 8))
+dendrogram_plot = dendrogram(linked, labels=data_transposed.index, orientation='top', distance_sort='descending', show_leaf_counts=True)
+
+# Color the dendrogram branches to aid the visualisation of differentiation and similarities between states
+for xs, ys, idx in zip(dendrogram_plot['icoord'], dendrogram_plot['dcoord'], dendrogram_plot['leaves']):
+    color = color_dict[merged_data.iloc[idx]['disease.state']]
+    plt.plot(xs, ys, color)
+# Define a title and the labels
+plt.title('Hierarchical Clustering Dendrogram')
+plt.xlabel('Sample Index')
+plt.ylabel('Distance')
+
+# Create a legend to show the different disease states
+for label, color in color_dict.items(): plt.plot([], [], color=color, label=label)
+plt.legend(loc='upper right', title='Disease State')
+plt.show()
+
+# Q2 Which, if any, individual genes differ significantly in expression between the four disease states? Volcano plots would be useful here. If there are differences, what do they mean biologically?
+
+# Import libraries needed 
+
+import pandas as pd
+import numpy as np
+from scipy.stats import ttest_ind
+import statsmodels.stats.multitest as smm import matplotlib.pyplot as plt
+
+# Read the data and metadata CSV files into pandas dataframes
+data_df = pd.read_csv('dengue_data.csv', index_col=0)
+metadata_df = pd.read_csv('dengue_metadata.csv')
+
+# Align the data with the metadata dataframe
+data_aligned = data_df.loc[:, metadata_df['sample'].values]
+
+# Define the disease states to create comparisons
+disease_states = metadata_df['disease.state'].unique()
+
+# Initialize a dictionary to store results for each comparison
+all_comparisons = {}
+
+# Perform t-tests between all pairs of disease states to distinguish between correspondences
+for i, state1 in enumerate(disease_states): for state2 in disease_states[i+1:]:
+        # Get the sample names for each state
+        samples1 = metadata_df['sample'][metadata_df['disease.state'] == state1].values
+        samples2 = metadata_df['sample'][metadata_df['disease.state'] == state2].values
+        # Subset the data for the two states to create a volcano representation
+        state1_data = data_aligned[samples1]
+        state2_data = data_aligned[samples2]
+        # Perform t-tests and save the results obtained
+        p_values = []
+        fold_changes = []
+        for gene in data_df.index:
+            gene_data1 = state1_data.loc[gene].dropna() 
+            gene_data2 = state2_data.loc[gene].dropna()
+            if len(gene_data1) > 1 and len(gene_data2) > 1:
+                t_stat, p_val = ttest_ind(gene_data1, gene_data2, equal_var=False)
+                fold_change = np.log2(np.mean(gene_data2) / np.mean(gene_data1))
+                p_values.append(p_val)
+                fold_changes.append(fold_change)
+            else:
+                p_values.append(np.nan) 
+                fold_changes.append(np.nan)
+        # Adjust the p-values for multiple testing
+        adjusted_p_values = smm.multipletests(p_values, method='fdr_bh')[1] 
+        # Store results in the dictionary
+        all_comparisons[(state1, state2)] = (fold_changes, adjusted_p_values)
+
+# Create a volcano plot for each state comparison
+for (state1, state2), (fold_changes, adjusted_p_values) in all_comparisons. ↪items():
+    fold_changes = np.array(fold_changes)
+    valid_indices = ~np.isnan(adjusted_p_values) & ~np.isnan(fold_changes)
+    fold_changes = fold_changes[valid_indices]
+    adjusted_p_values = adjusted_p_values[valid_indices]
+    genes = data_df.index[valid_indices]
+    
+    # Define a thresholds to establish the significance importance of values
+    p_value_threshold = 0.05
+    fold_change_threshold = 0.58
+    # Create a DataFrame for the volcano plot state
+    volcano_df = pd.DataFrame({
+       'Gene': genes,
+       'Log2FoldChange': fold_changes,
+       'AdjustedPValue': adjusted_p_values,
+       'Significant': (adjusted_p_values < p_value_threshold) & (abs(fold_changes) > fold_change_threshold) })
+    
+    # Display the volcano plots for each comparison state
+    plt.figure(figsize=(10, 6))
+    plt.scatter(volcano_df['Log2FoldChange'], -np.log10(volcano_df['AdjustedPValue']), c=volcano_df['Significant'].map({True: 'red', False: 'darkgrey'}), alpha=0.7)
+    plt.title(f'Volcano Plot for {state1} vs {state2}')
+    plt.xlabel('Log2 Fold Change')
+    plt.ylabel('-Log10 Adjusted P-Value') plt.axhline(y=-np.log10(p_value_threshold), color='grey', linestyle='--') plt.axvline(x=fold_change_threshold, color='grey', linestyle='--') plt.axvline(x=-fold_change_threshold, color='grey', linestyle='--') plt.grid(True)
+    plt.show()
+
+    # Print the significant genes obtained from the statistical approaches
+    significant_genes = volcano_df[volcano_df['Significant']] print(f"\nSignificant genes between {state1} and {state2}:") print(significant_genes[['Gene', 'Log2FoldChange', 'AdjustedPValue']].to_string(index=False))
+
+# Q3) From a clinical treatment perspective, it would be useful if transcriptomics data could be used to distinguish between patients with dengue fever and dengue haemorrhagic fever. Is it possible to do this using machine learning?
+
+# Import libraries needed
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+# Read the data and metadata CSV files into pandas dataframes
+data_df = pd.read_csv('dengue_data.csv', index_col=0)
+metadata_df = pd.read_csv('dengue_metadata.csv')
+
+# Filter data and metadata for "Dengue Fever" and "Dengue Haemorrhagic Fever" samples
+selected_states = ['Dengue Fever', 'Dengue Hemorrhagic Fever']
+filtered_data = metadata_df[metadata_df['disease.state'].isin(selected_states)]
+combined_data = pd.merge(filtered_data, data_df.T, left_on = 'sample',right_index= True)
+
+# Encode disease states into numerical labels
+labencoder = LabelEncoder()
+combined_data['encoded_state'] = labencoder.fit_transform(combined_data['disease.state'])
+
+# Separate features (gene expressions) and labels (encoded disease states)
+x = combined_data.iloc[:, 8:]
+y = combined_data['encoded_state']
+
+# Split data into training and testing sets
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size= 0.3, random_state=100)
+
+# Train a classifier using SVM
+svm_class = SVC(kernel='linear', random_state=100)
+svm_class.fit(x_train, y_train)
+
+# Create a prediction test
+y_pred = svm_class.predict(x_test)
+
+# Test the classifier's performance
+accuracy = accuracy_score(y_test, y_pred)
+confmatrix= confusion_matrix(y_test, y_pred)
+classreport = classification_report(y_test, y_pred, target_names= labencoder.classes_)
+
+# Display the results of the Accuracy and Classification Report values
+print(f'Accuracy: {accuracy:.2f}') print('Classification Report:') print(classreport)
+
+
+#Create a heatmap for the confusion matrix visualisation
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(confmatrix, annot=True, fmt='d', cmap= 'Greens',xticklabels=labencoder.classes_, yticklabels=labencoder.classes_) plt.title('Confusion Matrix Heatmap')
+plt.xlabel('Predicted Value')
+plt.ylabel('True Value')
+plt.show()
+
+# Create bootstrap validation to verify the model stability
+fit = []
+for i in range(100):
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
+    classifier = SVC()
+    classifier.fit(x_train, y_train)
+    fit.append(classifier.score(x_test, y_test))
+
+# Display the Average Accuracy result
+average_accuracy = np.mean(fit)
+print(f'Average Accuracy per 100 iterations of bootstrapping: {average_accuracy:.4f}')
+
