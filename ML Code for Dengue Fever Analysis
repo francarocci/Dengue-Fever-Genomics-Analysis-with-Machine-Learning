@@ -14,7 +14,6 @@ print("\nMetadata dataframe:")
 metadata_df
 
 # Import library needed 
-
 from sklearn.decomposition import PCA import matplotlib.pyplot as plt import seaborn as sns
 
 # Read the data and metadata CSV files into pandas dataframes
@@ -95,7 +94,6 @@ plt.show()
 # Q2 Which, if any, individual genes differ significantly in expression between the four disease states? Volcano plots would be useful here. If there are differences, what do they mean biologically?
 
 # Import libraries needed 
-
 import pandas as pd
 import numpy as np
 from scipy.stats import ttest_ind
@@ -173,7 +171,6 @@ for (state1, state2), (fold_changes, adjusted_p_values) in all_comparisons. ↪i
 # Q3) From a clinical treatment perspective, it would be useful if transcriptomics data could be used to distinguish between patients with dengue fever and dengue haemorrhagic fever. Is it possible to do this using machine learning?
 
 # Import libraries needed
-import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -216,9 +213,7 @@ classreport = classification_report(y_test, y_pred, target_names= labencoder.cla
 # Display the results of the Accuracy and Classification Report values
 print(f'Accuracy: {accuracy:.2f}') print('Classification Report:') print(classreport)
 
-
 #Create a heatmap for the confusion matrix visualisation
-
 plt.figure(figsize=(10, 8))
 sns.heatmap(confmatrix, annot=True, fmt='d', cmap= 'Greens',xticklabels=labencoder.classes_, yticklabels=labencoder.classes_) plt.title('Confusion Matrix Heatmap')
 plt.xlabel('Predicted Value')
